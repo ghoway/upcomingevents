@@ -1,0 +1,87 @@
+generator client {
+    provider = "prisma-client-js"
+    output   = "../src/generated/prisma"
+}
+
+datasource db {
+    provider = "sqlite"
+}
+
+model Department {
+    id        String    @id @default(cuid())
+    name      String
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    deletedAt DateTime?
+
+    rooms     Room[]
+    employees Employee[]
+}
+
+model Room {
+    id           String    @id @default(cuid())
+    name         String
+    departmentId String?
+    isMainRoom   Boolean   @default(false)
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    deletedAt    DateTime?
+
+    department Department? @relation(fields: [departmentId], references: [id])
+    events     Event[]
+}
+
+model Employee {
+    id           String    @id @default(cuid())
+    name         String
+    nip          String?
+    departmentId String
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    deletedAt    DateTime?
+
+    department Department @relation(fields: [departmentId], references: [id])
+    user       User?
+    events     Event[]
+}
+
+model User {
+    id         String    @id @default(cuid())
+    username   String    @unique
+    password   String
+    role       String    @default("USER")
+    employeeId String?   @unique
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    deletedAt  DateTime?
+
+    employee Employee? @relation(fields: [employeeId], references: [id])
+    events   Event[]
+}
+
+model Event {
+    id          String    @id @default(cuid())
+    title       String
+    description String?
+    roomId      String
+    employeeId  String
+    userId      String
+    date        String
+    startTime   String
+    endTime     String
+    status      String    @default("PENDING")
+    remarks     String?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    deletedAt   DateTime?
+
+    room     Room     @relation(fields: [roomId], references: [id])
+    employee Employee @relation(fields: [employeeId], references: [id])
+    user     User     @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+    id    String @id @default(cuid())
+    key   String @unique
+    value String
+}
