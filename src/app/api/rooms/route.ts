@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { name, departmentId } = await request.json();
+    const { name, departmentId, isMainRoom } = await request.json();
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
     const room = await prisma.room.create({
       data: {
         name: name.trim(),
-        departmentId: departmentId || null,
+        isMainRoom: isMainRoom || false,
+        departmentId: isMainRoom ? null : (departmentId || null),
       },
       include: { department: true },
     });

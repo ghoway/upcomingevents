@@ -25,7 +25,8 @@ app.prepare().then(() => {
     }
   });
 
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  // Use noServer mode so we don't hijack ALL upgrade requests
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on('connection', (ws) => {
     clients.add(ws);
@@ -40,6 +41,17 @@ app.prepare().then(() => {
       console.error('[WS] Client error:', err);
       clients.delete(ws);
     });
+  });
+
+  // Only handle upgrade for /ws path, let Next.js handle everything else (HMR etc.)
+  server.on('upgrade', (req, socket, head) => {
+    const { pathname } = parse(req.url!, true);
+    if (pathname === '/ws') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+    }
+    // Do NOT destroy socket for other paths - Next.js needs them for HMR
   });
 
   // Make broadcast function available globally

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/components/Toast';
 import { DoorOpen, Plus, Edit, Trash2, X, AlertCircle, Star } from 'lucide-react';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Room {
   id: string; name: string; isMainRoom: boolean;
@@ -16,18 +17,22 @@ export default function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', departmentId: '' });
+  const [form, setForm] = useState({ name: '', departmentId: '', isMainRoom: false });
   const [error, setError] = useState('');
   const { toast } = useToast();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const [rRes, dRes] = await Promise.all([fetch('/api/rooms'), fetch('/api/departments')]);
     setRooms(await rRes.json());
     setDepartments(await dRes.json());
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useWebSocket(useCallback((msg: { type: string }) => {
+    if (msg.type === 'room-updated' || msg.type === 'department-updated') fetchData();
+  }, [fetchData]));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -35,7 +40,7 @@ export default function RoomsPage() {
     const method = editId ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     if (!res.ok) { setError((await res.json()).error); return; }
-    setShowModal(false); setEditId(null); setForm({ name: '', departmentId: '' }); fetchData();
+    setShowModal(false); setEditId(null); setForm({ name: '', departmentId: '', isMainRoom: false });
   };
 
   const handleDelete = async (id: string) => {
@@ -43,15 +48,14 @@ export default function RoomsPage() {
     const res = await fetch(`/api/rooms/${id}`, { method: 'DELETE' });
     if (!res.ok) { toast('error', (await res.json()).error); return; }
     toast('success', 'Ruangan berhasil dihapus');
-    fetchData();
   };
 
   const openEdit = (room: Room) => {
-    setEditId(room.id); setForm({ name: room.name, departmentId: room.departmentId || '' }); setShowModal(true); setError('');
+    setEditId(room.id); setForm({ name: room.name, departmentId: room.departmentId || '', isMainRoom: room.isMainRoom }); setShowModal(true); setError('');
   };
 
   const openCreate = () => {
-    setEditId(null); setForm({ name: '', departmentId: '' }); setShowModal(true); setError('');
+    setEditId(null); setForm({ name: '', departmentId: '', isMainRoom: false }); setShowModal(true); setError('');
   };
 
   return (
@@ -132,12 +136,20 @@ export default function RoomsPage() {
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text text-sm" required />
               </div>
               <div>
-                <label className="block text-sm text-text-muted mb-1">Unit Kerja (opsional)</label>
-                <select value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text text-sm">
-                  <option value="">- Tidak ke unit kerja -</option>
-                  {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.isMainRoom} onChange={(e) => setForm({ ...form, isMainRoom: e.target.checked, departmentId: e.target.checked ? '' : form.departmentId })} className="w-4 h-4 rounded border-border accent-amber-500" />
+                  <span className="text-sm text-text-muted">Ruang Utama</span>
+                </label>
               </div>
+              {!form.isMainRoom && (
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">Unit Kerja (opsional)</label>
+                  <select value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text text-sm">
+                    <option value="">- Tidak ke unit kerja -</option>
+                    {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-text-muted text-sm">Batal</button>
                 <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm">Simpan</button>

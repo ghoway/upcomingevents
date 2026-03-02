@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Building2, Plus, Edit, Trash2, X, AlertCircle } from 'lucide-react';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Department {
   id: string;
@@ -18,13 +19,17 @@ export default function DepartmentsPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     const res = await fetch('/api/departments');
     setDepartments(await res.json());
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchDepartments(); }, []);
+  useEffect(() => { fetchDepartments(); }, [fetchDepartments]);
+
+  useWebSocket(useCallback((msg: { type: string }) => {
+    if (msg.type === 'department-updated') fetchDepartments();
+  }, [fetchDepartments]));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,13 +38,12 @@ export default function DepartmentsPage() {
     const method = editId ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
     if (!res.ok) { setError((await res.json()).error); return; }
-    setShowModal(false); setEditId(null); setName(''); fetchDepartments();
+    setShowModal(false); setEditId(null); setName('');
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Yakin ingin menghapus unit kerja ini?')) return;
     await fetch(`/api/departments/${id}`, { method: 'DELETE' });
-    fetchDepartments();
   };
 
   const openEdit = (dept: Department) => {
