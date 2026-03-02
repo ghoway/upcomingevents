@@ -19,6 +19,7 @@
     "@libsql/client": "^0.17.0",
     "@prisma/adapter-libsql": "^7.4.2",
     "@prisma/client": "7.4.2",
+    "@prisma/client-runtime-utils": "^7.4.2",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.575.0",

@@ -4,6 +4,9 @@ import { defineConfig } from 'prisma/config';
 export default defineConfig({
   earlyAccess: true,
   schema: path.join(__dirname, 'prisma', 'schema.prisma'),
+  datasource: {
+    url: `file:${path.join(__dirname, 'prisma', 'dev.db')}`,
+  },
   migrate: {
     async adapter() {
       const { createClient } = await import('@libsql/client');

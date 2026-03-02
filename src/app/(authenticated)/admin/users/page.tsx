@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { UserCog, Plus, Edit, Trash2, X, AlertCircle, Shield } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useToast } from '@/components/Toast';
+import { UserCog, Plus, Edit, Trash2, X, AlertCircle, Shield, KeyRound } from 'lucide-react';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Employee { id: string; name: string; department: { name: string } | null; }
 interface User {
@@ -17,15 +19,27 @@ export default function UsersPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ username: '', password: '', role: 'USER', employeeId: '' });
   const [error, setError] = useState('');
+  const { toast } = useToast();
 
-  const fetchData = async () => {
+  // Reset password modal state
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetUser, setResetUser] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetting, setResetting] = useState(false);
+
+  const fetchData = useCallback(async () => {
     const [userRes, empRes] = await Promise.all([fetch('/api/users'), fetch('/api/employees')]);
     setUsers(await userRes.json());
     setEmployees(await empRes.json());
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useWebSocket(useCallback((msg: { type: string }) => {
+    if (msg.type === 'user-updated' || msg.type === 'employee-updated') fetchData();
+  }, [fetchData]));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -34,12 +48,12 @@ export default function UsersPage() {
     const body = editId && !form.password ? { ...form, password: undefined } : form;
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!res.ok) { setError((await res.json()).error); return; }
-    setShowModal(false); setEditId(null); setForm({ username: '', password: '', role: 'USER', employeeId: '' }); fetchData();
+    setShowModal(false); setEditId(null); setForm({ username: '', password: '', role: 'USER', employeeId: '' });
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Yakin ingin menghapus pengguna ini?')) return;
-    await fetch(`/api/users/${id}`, { method: 'DELETE' }); fetchData();
+    await fetch(`/api/users/${id}`, { method: 'DELETE' });
   };
 
   const openEdit = (u: User) => {
@@ -48,6 +62,33 @@ export default function UsersPage() {
 
   const openCreate = () => {
     setEditId(null); setForm({ username: '', password: '', role: 'USER', employeeId: '' }); setShowModal(true); setError('');
+  };
+
+  const openResetPassword = (u: User) => {
+    setResetUser(u); setResetPassword(''); setResetError(''); setShowResetModal(true);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault(); setResetError('');
+    if (!resetUser) return;
+    if (resetPassword.length < 6) { setResetError('Password minimal 6 karakter'); return; }
+
+    setResetting(true);
+    try {
+      const res = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: resetUser.id, newPassword: resetPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setResetError(data.error || 'Gagal mereset password'); return; }
+      toast('success', `Password ${resetUser.username} berhasil direset`);
+      setShowResetModal(false); setResetUser(null); setResetPassword('');
+    } catch {
+      setResetError('Terjadi kesalahan jaringan');
+    } finally {
+      setResetting(false);
+    }
   };
 
   return (
@@ -73,7 +114,7 @@ export default function UsersPage() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-text-muted uppercase">Pegawai</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-text-muted uppercase">Unit Kerja</th>
                 <th className="text-center px-5 py-3 text-xs font-semibold text-text-muted uppercase">Role</th>
-                <th className="text-center px-5 py-3 text-xs font-semibold text-text-muted uppercase w-28">Aksi</th>
+                <th className="text-center px-5 py-3 text-xs font-semibold text-text-muted uppercase w-36">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -99,8 +140,9 @@ export default function UsersPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => openEdit(u)} className="p-1.5 rounded-lg hover:bg-surface-lighter text-text-muted hover:text-text transition-colors"><Edit className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(u.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => openResetPassword(u)} title="Reset Password" className="p-1.5 rounded-lg hover:bg-amber-500/10 text-text-muted hover:text-amber-400 transition-colors"><KeyRound className="w-4 h-4" /></button>
+                      <button onClick={() => openEdit(u)} title="Edit" className="p-1.5 rounded-lg hover:bg-surface-lighter text-text-muted hover:text-text transition-colors"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete(u.id)} title="Hapus" className="p-1.5 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -110,6 +152,7 @@ export default function UsersPage() {
         </div>
       )}
 
+      {/* Create/Edit User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface-light border border-border rounded-2xl p-6 w-full max-w-md">
@@ -144,6 +187,51 @@ export default function UsersPage() {
               <div className="flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-text-muted text-sm">Batal</button>
                 <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetModal && resetUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-light border border-border rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-text">Reset Password</h2>
+              <button onClick={() => setShowResetModal(false)} className="p-1 hover:bg-surface-lighter rounded-lg"><X className="w-5 h-5 text-text-muted" /></button>
+            </div>
+
+            <div className="flex items-center gap-3 bg-surface/50 border border-border rounded-xl p-3 mb-4">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${resetUser.role === 'ADMIN' ? 'bg-amber-500/10' : 'bg-blue-500/10'}`}>
+                <UserCog className={`w-4 h-4 ${resetUser.role === 'ADMIN' ? 'text-amber-400' : 'text-blue-400'}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-text">{resetUser.username}</p>
+                <p className="text-xs text-text-muted">{resetUser.employee?.name || 'Tidak terkait pegawai'}</p>
+              </div>
+            </div>
+
+            {resetError && <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 rounded-lg text-sm mb-4"><AlertCircle className="w-4 h-4" />{resetError}</div>}
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Password Baru</label>
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text text-sm"
+                  required
+                  minLength={6}
+                  placeholder="Minimal 6 karakter"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShowResetModal(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-text-muted text-sm">Batal</button>
+                <button type="submit" disabled={resetting} className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm disabled:opacity-50">
+                  {resetting ? 'Mereset...' : 'Reset Password'}
+                </button>
               </div>
             </form>
           </div>

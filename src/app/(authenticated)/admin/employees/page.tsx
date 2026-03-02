@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Edit, Trash2, X, AlertCircle } from 'lucide-react';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Department { id: string; name: string; }
 interface Employee {
@@ -19,16 +20,20 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({ name: '', nip: '', departmentId: '' });
   const [error, setError] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const [empRes, deptRes] = await Promise.all([
       fetch('/api/employees'), fetch('/api/departments')
     ]);
     setEmployees(await empRes.json());
     setDepartments(await deptRes.json());
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useWebSocket(useCallback((msg: { type: string }) => {
+    if (msg.type === 'employee-updated' || msg.type === 'department-updated') fetchData();
+  }, [fetchData]));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -36,12 +41,12 @@ export default function EmployeesPage() {
     const method = editId ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     if (!res.ok) { setError((await res.json()).error); return; }
-    setShowModal(false); setEditId(null); setForm({ name: '', nip: '', departmentId: '' }); fetchData();
+    setShowModal(false); setEditId(null); setForm({ name: '', nip: '', departmentId: '' });
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Yakin ingin menghapus pegawai ini?')) return;
-    await fetch(`/api/employees/${id}`, { method: 'DELETE' }); fetchData();
+    await fetch(`/api/employees/${id}`, { method: 'DELETE' });
   };
 
   const openEdit = (emp: Employee) => {

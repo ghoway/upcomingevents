@@ -6,8 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, Building2, Users, UserCog, DoorOpen,
-  CalendarCheck, Settings, Database, LogOut, Menu, X,
-  ChevronRight, Monitor, Shield
+  CalendarCheck, Settings, LogOut, Menu, X,
+  ChevronRight, Monitor, Shield, KeyRound
 } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -43,11 +43,11 @@ export default function AuthenticatedShell({ children }: { children: React.React
     { href: '/admin/users', label: 'Pengguna', icon: UserCog },
     { href: '/admin/rooms', label: 'Ruangan', icon: DoorOpen },
     { href: '/admin/settings', label: 'Pengaturan', icon: Settings },
-    { href: '/admin/backup', label: 'Backup Database', icon: Database },
   ];
 
   const userLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/change-password', label: 'Ubah Password', icon: KeyRound },
   ];
 
   const navLinks = isAdmin ? [...userLinks, ...adminLinks] : userLinks;

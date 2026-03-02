@@ -11,11 +11,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params;
-    const { name, departmentId } = await request.json();
+    const { name, departmentId, isMainRoom } = await request.json();
 
     const room = await prisma.room.update({
       where: { id },
-      data: { name: name.trim(), departmentId: departmentId || null },
+      data: {
+        name: name.trim(),
+        isMainRoom: isMainRoom || false,
+        departmentId: isMainRoom ? null : (departmentId || null),
+      },
     });
 
     broadcast('room-updated');
