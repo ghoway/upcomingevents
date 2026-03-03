@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/components/Toast';
-import { DoorOpen, Plus, Edit, Trash2, X, AlertCircle, Star } from 'lucide-react';
+import { DoorOpen, Plus, Edit, Trash2, X, AlertCircle, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Room {
@@ -19,20 +19,32 @@ export default function RoomsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', departmentId: '', isMainRoom: false });
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
-    const [rRes, dRes] = await Promise.all([fetch('/api/rooms'), fetch('/api/departments')]);
-    setRooms(await rRes.json());
-    setDepartments(await dRes.json());
+    setLoading(true);
+    const [rRes, dRes] = await Promise.all([
+      fetch(`/api/rooms?page=${page}&limit=${limit}`), 
+      fetch('/api/departments?page=1&limit=1000')
+    ]);
+    const rData = await rRes.json();
+    const dData = await dRes.json();
+    setRooms(rData.data);
+    setTotal(rData.total);
+    setDepartments(dData.data);
     setLoading(false);
-  }, []);
+  }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useWebSocket(useCallback((msg: { type: string }) => {
     if (msg.type === 'room-updated' || msg.type === 'department-updated') fetchData();
   }, [fetchData]));
+
+  const totalPages = Math.ceil(total / limit);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -119,6 +131,40 @@ export default function RoomsPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <p className="text-sm text-text-muted">
+                Menampilkan {(page - 1) * limit + 1} - {Math.min(page * limit, total)} dari {total} data
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                      page === p ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-lighter border border-border'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

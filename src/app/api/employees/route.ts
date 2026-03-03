@@ -7,20 +7,28 @@ import { broadcast } from '@/lib/websocket';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const skip = (page - 1) * limit;
     const departmentId = searchParams.get('departmentId');
 
     const where: any = { deletedAt: null };
     if (departmentId) where.departmentId = departmentId;
 
-    const employees = await prisma.employee.findMany({
-      where,
-      include: {
-        department: true,
-        user: { select: { id: true, username: true, role: true } },
-      },
-      orderBy: { name: 'asc' },
-    });
-    return NextResponse.json(employees);
+    const [employees, total] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        include: {
+          department: true,
+          user: { select: { id: true, username: true, role: true } },
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.employee.count({ where }),
+    ]);
+    return NextResponse.json({ data: employees, total, page, limit });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch employees' }, { status: 500 });
   }

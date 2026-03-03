@@ -24,6 +24,9 @@ export default function AdminEventsPage() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filter, setFilter] = useState<string>('ALL');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
   const { toast } = useToast();
 
   // Remarks modal state
@@ -35,15 +38,20 @@ export default function AdminEventsPage() {
     remarks: string;
   }>({ open: false, eventId: '', action: 'reject', eventTitle: '', remarks: '' });
 
-  const fetchEvents = useCallback(async () => {
-    const params = new URLSearchParams({ date: selectedDate });
+const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ date: selectedDate, page: page.toString(), limit: limit.toString() });
     if (filter !== 'ALL') params.set('status', filter);
     const res = await fetch(`/api/events?${params}`);
-    setEvents(await res.json());
-    setLoading((prev) => prev ? false : prev);
-  }, [selectedDate, filter]);
+    const data = await res.json();
+    setEvents(data.data);
+    setTotal(data.total);
+    setLoading(false);
+  }, [selectedDate, filter, page]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
+  const totalPages = Math.ceil(total / limit);
 
   useWebSocket((msg) => {
     if (msg.type === 'event-updated') fetchEvents();
@@ -217,12 +225,46 @@ export default function AdminEventsPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                ))}
+              </tbody>
+            </table>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                <p className="text-sm text-text-muted">
+                  Menampilkan {(page - 1) * limit + 1} - {Math.min(page * limit, total)} dari {total} agenda
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                        page === p ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-lighter border border-border'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+      )}
 
           {/* All events */}
           <div className="bg-surface-light border border-border rounded-xl overflow-hidden">

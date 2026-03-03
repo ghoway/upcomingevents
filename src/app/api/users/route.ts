@@ -5,28 +5,38 @@ import { broadcast } from '@/lib/websocket';
 import bcryptjs from 'bcryptjs';
 
 // GET /api/users - List all users
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session || (session.user as any).role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const users = await prisma.user.findMany({
-      where: { deletedAt: null },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        employeeId: true,
-        createdAt: true,
-        employee: {
-          select: { name: true, department: { select: { name: true, id: true } } },
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          employeeId: true,
+          createdAt: true,
+          employee: {
+            select: { name: true, department: { select: { name: true, id: true } } },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    return NextResponse.json(users);
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.user.count({ where: { deletedAt: null } }),
+    ]);
+    return NextResponse.json({ data: users, total, page, limit });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
   }

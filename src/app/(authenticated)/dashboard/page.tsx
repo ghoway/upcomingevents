@@ -54,25 +54,28 @@ export default function UserDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const fetchEvents = useCallback(async () => {
+const fetchEvents = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ date: selectedDate });
+      const params = new URLSearchParams({ date: selectedDate, page: '1', limit: '100' });
       if (user?.departmentId) params.set('departmentId', user.departmentId);
       const res = await fetch(`/api/events?${params}`);
-      setEvents(await res.json());
+      const data = await res.json();
+      setEvents(data.data);
     } catch (err) {
       console.error(err);
     }
   }, [selectedDate, user?.departmentId]);
 
-  const fetchStaticData = useCallback(async () => {
+const fetchStaticData = useCallback(async () => {
     try {
       const [roomRes, empRes] = await Promise.all([
-        fetch('/api/rooms'),
-        fetch(`/api/employees?departmentId=${user?.departmentId || ''}`),
+        fetch('/api/rooms?page=1&limit=1000'),
+        fetch(`/api/employees?page=1&limit=1000&departmentId=${user?.departmentId || ''}`),
       ]);
-      setRooms(await roomRes.json());
-      setEmployees(await empRes.json());
+      const roomData = await roomRes.json();
+      const empData = await empRes.json();
+      setRooms(roomData.data);
+      setEmployees(empData.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -153,37 +156,38 @@ export default function UserDashboard() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-text">Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-text">Dashboard</h1>
           <p className="text-text-muted text-sm mt-1">
             {user?.departmentName ? `Agenda ${user.departmentName}` : 'Semua Agenda'}
           </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-blue-500/20"
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-blue-500/20"
           id="propose-event"
         >
           <Plus className="w-4 h-4" />
-          Ajukan Agenda
+          <span className="sm:hidden lg:inline">Ajukan Agenda</span>
+          <span className="hidden sm:inline lg:hidden">Ajukan</span>
         </button>
       </div>
 
       {/* Date filter */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-light border border-border">
-          <Calendar className="w-4 h-4 text-primary-light" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-light border border-border w-full sm:w-auto">
+          <Calendar className="w-4 h-4 text-primary-light shrink-0" />
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-transparent text-text text-sm border-none outline-none"
+            className="bg-transparent text-text text-sm border-none outline-none w-full min-w-0"
           />
         </div>
         <button
           onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
-          className="px-3 py-2 rounded-lg bg-primary/10 text-primary-light border border-primary/20 hover:bg-primary/20 text-xs font-medium transition-colors"
+          className="px-3 py-2 rounded-lg bg-primary/10 text-primary-light border border-primary/20 hover:bg-primary/20 text-xs font-medium transition-colors whitespace-nowrap"
         >
           Hari Ini
         </button>
@@ -196,67 +200,67 @@ export default function UserDashboard() {
       ) : (
         <div className="space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-surface-light border border-border rounded-xl p-4">
               <div className="flex items-center justify-between">
-                <span className="text-text-muted text-sm">Dikonfirmasi</span>
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <span className="text-text-muted text-sm truncate">Dikonfirmasi</span>
+                <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
               </div>
               <p className="text-2xl font-bold text-emerald-400 mt-1">{confirmedEvents.length}</p>
             </div>
             <div className="bg-surface-light border border-border rounded-xl p-4">
               <div className="flex items-center justify-between">
-                <span className="text-text-muted text-sm">Menunggu</span>
-                <Clock className="w-5 h-5 text-amber-400" />
+                <span className="text-text-muted text-sm truncate">Menunggu</span>
+                <Clock className="w-5 h-5 text-amber-400 shrink-0" />
               </div>
               <p className="text-2xl font-bold text-amber-400 mt-1">{pendingEvents.length}</p>
             </div>
             <div className="bg-surface-light border border-border rounded-xl p-4">
               <div className="flex items-center justify-between">
-                <span className="text-text-muted text-sm">Total</span>
-                <Calendar className="w-5 h-5 text-primary-light" />
+                <span className="text-text-muted text-sm truncate">Total</span>
+                <Calendar className="w-5 h-5 text-primary-light shrink-0" />
               </div>
               <p className="text-2xl font-bold text-primary-light mt-1">{events.length}</p>
             </div>
           </div>
 
           {/* Events table */}
-          <div className="bg-surface-light border border-border rounded-xl overflow-hidden">
-            <table className="w-full">
+          <div className="bg-surface-light border border-border rounded-xl overflow-x-auto">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="bg-surface-lighter border-b border-border">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase">Agenda</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase">Ruangan</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase">PIC</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-text-muted uppercase">Waktu</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-text-muted uppercase">Status</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-text-muted uppercase">Aksi</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-text-muted uppercase">Agenda</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-text-muted uppercase hidden md:table-cell">Ruangan</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-text-muted uppercase">PIC</th>
+                  <th className="text-center px-3 sm:px-4 py-3 text-xs font-semibold text-text-muted uppercase hidden sm:table-cell">Waktu</th>
+                  <th className="text-center px-3 sm:px-4 py-3 text-xs font-semibold text-text-muted uppercase">Status</th>
+                  <th className="text-center px-3 sm:px-4 py-3 text-xs font-semibold text-text-muted uppercase">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {events.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center px-4 py-12 text-text-muted">
+                    <td colSpan={6} className="text-center px-4 py-8 sm:py-12 text-text-muted text-sm">
                       Tidak ada agenda pada tanggal ini
                     </td>
                   </tr>
                 )}
                 {events.map((event) => (
                   <tr key={event.id} className="border-b border-border/50 hover:bg-surface-lighter/30 transition-colors">
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-3">
                       <p className="text-sm font-medium text-text">{event.title}</p>
-                      {event.description && <p className="text-xs text-text-muted mt-0.5">{event.description}</p>}
+                      {event.description && <p className="text-xs text-text-muted mt-0.5 hidden sm:block">{event.description}</p>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-text">{event.room.name}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-3 text-sm text-text hidden md:table-cell">{event.room.name}</td>
+                    <td className="px-3 sm:px-4 py-3">
                       <p className="text-sm text-text">{event.employee.name}</p>
-                      <p className="text-xs text-text-muted">{event.employee.department.name}</p>
+                      <p className="text-xs text-text-muted hidden sm:block">{event.employee.department.name}</p>
                     </td>
-                    <td className="px-4 py-3 text-center text-sm font-mono text-text">
+                    <td className="px-3 sm:px-4 py-3 text-center text-xs sm:text-sm font-mono text-text hidden sm:table-cell">
                       {event.startTime} - {event.endTime}
                     </td>
-                    <td className="px-4 py-3 text-center">{statusBadge(event.status)}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 sm:px-4 py-3 text-center">{statusBadge(event.status)}</td>
+                    <td className="px-3 sm:px-4 py-3 text-center">
                       {(event.status === 'PENDING' && event.employee.id === user?.employeeId) && (
                         <button
                           onClick={() => handleCancel(event.id)}
@@ -277,9 +281,9 @@ export default function UserDashboard() {
       {/* Propose Event Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface-light border border-border rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-text">Ajukan Agenda Baru</h2>
+          <div className="bg-surface-light border border-border rounded-2xl p-4 sm:p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4 sm:mb-5">
+              <h2 className="text-base sm:text-lg font-bold text-text">Ajukan Agenda Baru</h2>
               <button onClick={() => setShowForm(false)} className="p-1 hover:bg-surface-lighter rounded-lg transition-colors">
                 <X className="w-5 h-5 text-text-muted" />
               </button>
@@ -292,7 +296,7 @@ export default function UserDashboard() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
               <div>
                 <label className="block text-sm font-medium text-text-muted mb-1">Judul Agenda *</label>
                 <input
@@ -312,7 +316,7 @@ export default function UserDashboard() {
                   placeholder="Detail agenda (opsional)"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-muted mb-1">Ruangan *</label>
                   <select
@@ -354,7 +358,7 @@ export default function UserDashboard() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-muted mb-1">Mulai *</label>
                   <input

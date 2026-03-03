@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/components/Toast';
-import { UserCog, Plus, Edit, Trash2, X, AlertCircle, Shield, KeyRound } from 'lucide-react';
+import { UserCog, Plus, Edit, Trash2, X, AlertCircle, Shield, KeyRound, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Employee { id: string; name: string; department: { name: string } | null; }
@@ -19,6 +19,9 @@ export default function UsersPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ username: '', password: '', role: 'USER', employeeId: '' });
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
   const { toast } = useToast();
 
   // Reset password modal state
@@ -29,17 +32,26 @@ export default function UsersPage() {
   const [resetting, setResetting] = useState(false);
 
   const fetchData = useCallback(async () => {
-    const [userRes, empRes] = await Promise.all([fetch('/api/users'), fetch('/api/employees')]);
-    setUsers(await userRes.json());
-    setEmployees(await empRes.json());
+    setLoading(true);
+    const [userRes, empRes] = await Promise.all([
+      fetch(`/api/users?page=${page}&limit=${limit}`), 
+      fetch('/api/employees?page=1&limit=1000')
+    ]);
+    const userData = await userRes.json();
+    const empData = await empRes.json();
+    setUsers(userData.data);
+    setTotal(userData.total);
+    setEmployees(empData.data);
     setLoading(false);
-  }, []);
+  }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useWebSocket(useCallback((msg: { type: string }) => {
     if (msg.type === 'user-updated' || msg.type === 'employee-updated') fetchData();
   }, [fetchData]));
+
+  const totalPages = Math.ceil(total / limit);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -149,6 +161,40 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <p className="text-sm text-text-muted">
+                Menampilkan {(page - 1) * limit + 1} - {Math.min(page * limit, total)} dari {total} data
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                      page === p ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-lighter border border-border'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

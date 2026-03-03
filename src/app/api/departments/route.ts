@@ -4,17 +4,28 @@ import { auth } from '@/lib/auth';
 import { broadcast } from '@/lib/websocket';
 
 // GET /api/departments - List all departments
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const departments = await prisma.department.findMany({
-      where: { deletedAt: null },
-      include: {
-        rooms: { where: { deletedAt: null } },
-        _count: { select: { employees: { where: { deletedAt: null } } } },
-      },
-      orderBy: { name: 'asc' },
-    });
-    return NextResponse.json(departments);
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const skip = (page - 1) * limit;
+
+    const [departments, total] = await Promise.all([
+      prisma.department.findMany({
+        where: { deletedAt: null },
+        include: {
+          rooms: { where: { deletedAt: null } },
+          _count: { select: { employees: { where: { deletedAt: null } } } },
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.department.count({ where: { deletedAt: null } }),
+    ]);
+
+    return NextResponse.json({ data: departments, total, page, limit });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch departments' }, { status: 500 });
   }

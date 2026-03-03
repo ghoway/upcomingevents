@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Edit, Trash2, X, AlertCircle } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, X, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Department { id: string; name: string; }
@@ -19,21 +19,30 @@ export default function EmployeesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', nip: '', departmentId: '' });
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     const [empRes, deptRes] = await Promise.all([
-      fetch('/api/employees'), fetch('/api/departments')
+      fetch(`/api/employees?page=${page}&limit=${limit}`), fetch('/api/departments?page=1&limit=1000')
     ]);
-    setEmployees(await empRes.json());
-    setDepartments(await deptRes.json());
+    const empData = await empRes.json();
+    const deptData = await deptRes.json();
+    setEmployees(empData.data);
+    setTotal(empData.total);
+    setDepartments(deptData.data);
     setLoading(false);
-  }, []);
+  }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useWebSocket(useCallback((msg: { type: string }) => {
     if (msg.type === 'employee-updated' || msg.type === 'department-updated') fetchData();
   }, [fetchData]));
+
+  const totalPages = Math.ceil(total / limit);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -110,6 +119,40 @@ export default function EmployeesPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <p className="text-sm text-text-muted">
+                Menampilkan {(page - 1) * limit + 1} - {Math.min(page * limit, total)} dari {total} data
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                      page === p ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-lighter border border-border'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
