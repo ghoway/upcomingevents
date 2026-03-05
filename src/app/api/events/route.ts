@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get('departmentId');
     const status = searchParams.get('status');
     const roomId = searchParams.get('roomId');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
 
     const where: any = { deletedAt: null };
     if (date) where.date = date;
@@ -20,19 +23,24 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status;
     if (roomId) where.roomId = roomId;
 
-    const events = await prisma.event.findMany({
-      where,
-      include: {
-        room: true,
-        employee: {
-          include: { department: true },
+    const [events, total] = await Promise.all([
+      prisma.event.findMany({
+        where,
+        include: {
+          room: true,
+          employee: {
+            include: { department: true },
+          },
+          user: { select: { id: true, username: true } },
         },
-        user: { select: { id: true, username: true } },
-      },
-      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-    });
+        orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      prisma.event.count({ where }),
+    ]);
 
-    return NextResponse.json(events);
+    return NextResponse.json({ data: events, total, page, limit });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
   }

@@ -12,10 +12,11 @@ import {
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function AuthenticatedShell({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const user = session?.user as any;
   const isAdmin = user?.role === 'ADMIN';
@@ -111,7 +112,7 @@ export default function AuthenticatedShell({ children }: { children: React.React
             <span>Tampilan TV</span>
           </Link>
           <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            onClick={() => setShowLogoutModal(true)}
             className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 w-full transition-colors"
           >
             <LogOut className="w-4 h-4" />
@@ -135,11 +136,43 @@ export default function AuthenticatedShell({ children }: { children: React.React
           <ThemeToggle />
         </div>
 
-        {/* Page content */}
+      {/* Page content */}
         <main className="p-6">
           {children}
         </main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <LogOut className="w-5 h-5 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-text">Konfirmasi Keluar</h3>
+            </div>
+            <p className="text-text-muted mb-6">Apakah Anda yakin ingin keluar dari aplikasi?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-text-muted hover:bg-surface-light transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  await signOut({ redirect: false });
+                  window.location.href = `${window.location.origin}/login`;
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                Keluar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

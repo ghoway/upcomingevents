@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Building2, Plus, Edit, Trash2, X, AlertCircle } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, X, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Department {
@@ -18,18 +18,26 @@ export default function DepartmentsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
 
   const fetchDepartments = useCallback(async () => {
-    const res = await fetch('/api/departments');
-    setDepartments(await res.json());
+    setLoading(true);
+    const res = await fetch(`/api/departments?page=${page}&limit=${limit}`);
+    const data = await res.json();
+    setDepartments(data.data);
+    setTotal(data.total);
     setLoading(false);
-  }, []);
+  }, [page]);
 
   useEffect(() => { fetchDepartments(); }, [fetchDepartments]);
 
   useWebSocket(useCallback((msg: { type: string }) => {
     if (msg.type === 'department-updated') fetchDepartments();
   }, [fetchDepartments]));
+
+  const totalPages = Math.ceil(total / limit);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +115,40 @@ export default function DepartmentsPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <p className="text-sm text-text-muted">
+                Menampilkan {(page - 1) * limit + 1} - {Math.min(page * limit, total)} dari {total} data
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                      page === p ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-lighter border border-border'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-lighter disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

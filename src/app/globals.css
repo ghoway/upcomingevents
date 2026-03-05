@@ -161,6 +161,15 @@ textarea:focus {
   animation: pulse-glow 2s infinite;
 }
 
+/* Meeting ongoing blink animation */
+@keyframes blink-red {
+  0%, 100% { background-color: rgba(239, 68, 68, 0.15); }
+  50% { background-color: rgba(239, 68, 68, 0.35); }
+}
+.meeting-ongoing {
+  animation: blink-red 1s ease-in-out infinite;
+}
+
 /* TV Dashboard gradient */
 .tv-gradient {
   background: linear-gradient(135deg, var(--tv-gradient-from), var(--tv-gradient-via), var(--tv-gradient-to));
